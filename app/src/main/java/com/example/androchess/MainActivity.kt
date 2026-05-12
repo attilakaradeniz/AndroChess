@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface // Added missing import
 import androidx.compose.ui.Modifier
+import com.example.androchess.domain.createInitialBoard
 // Corrected the path for ChessBoardView
 import com.example.androchess.ui.theme.ChessBoardView
 import com.example.androchess.ui.theme.AndroChessTheme
@@ -29,8 +30,10 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        // Draw our beautiful chess board
-                        ChessBoardView()
+                        // Create the initial state
+                        val initialBoardState = createInitialBoard()
+                        // Draw chess board
+                        ChessBoardView(boardState = initialBoardState)
                     }
                 }
             }

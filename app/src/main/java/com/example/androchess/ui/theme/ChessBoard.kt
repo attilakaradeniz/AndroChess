@@ -1,5 +1,6 @@
 package com.example.androchess.ui.theme
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.androchess.domain.BoardPosition
+import com.example.androchess.domain.ChessPiece
 
 // Standard chess board colors (pastel tones to be easy on eyes)
 // LATER: adding alternatives  - this is where we will define them.
@@ -23,7 +27,7 @@ val DarkSquareColor = Color(0xFF779556)  // Green
  * Using aspect ratio to ensure it stays square on any screen.
  */
 @Composable
-fun ChessBoardView() {
+fun ChessBoardView(boardState: Map<BoardPosition, ChessPiece>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -38,13 +42,29 @@ fun ChessBoardView() {
                     val isLightSquare = (row + col) % 2 == 0
                     val squareColor = if (isLightSquare) LightSquareColor else DarkSquareColor
 
+                    // The position we are currently drawing
+                    val currentPosition = BoardPosition(row, col)
+                    // Check if there is a piece at this position in our state map
+                    val pieceOnSquare = boardState[currentPosition]
+
                     // A Box Composable is a simple container to draw the square background
                     Box(
                         modifier = Modifier
                             .weight(1f) // Takes equal width in the Row
-                            .fillMaxSize() // Takes equal height in the Row (via weight)
+                            .fillMaxSize()
                             .background(squareColor)
-                    )
+                    ) {
+// If there is a piece, draw the Image
+                        if (pieceOnSquare != null) {
+                            Image(
+                                painter = painterResource(id = getPieceDrawable(pieceOnSquare)),
+                                contentDescription = "${pieceOnSquare.color} ${pieceOnSquare.type}",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(2.dp) // Tiny padding so pieces don't touch the very edges of the square
+                            )
+                        }
+                    }
                 }
             }
         }
