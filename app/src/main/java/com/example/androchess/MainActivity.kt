@@ -6,11 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.Surface // Added missing import
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+// Corrected the path for ChessBoardView
+import com.example.androchess.ui.theme.ChessBoardView
 import com.example.androchess.ui.theme.AndroChessTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +20,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AndroChessTheme {
+                // Scaffold provides the safe area padding
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    Surface(
+                        // Apply the innerPadding here so the board doesn't overlap with the status bar
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        // Draw our beautiful chess board
+                        ChessBoardView()
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AndroChessTheme {
-        Greeting("Android")
     }
 }
