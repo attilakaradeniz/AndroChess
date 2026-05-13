@@ -24,6 +24,9 @@ fun ChessBoardView(viewModel: ChessViewModel) {
     // Observe the board state from the ViewModel
     val boardState by viewModel.boardState.collectAsState()
 
+    // state for boerd direction
+    val isFlipped by viewModel.isBoardFlipped.collectAsState()
+
     // BoxWithConstraints allows us to know the exact pixel size of the screen/board
     BoxWithConstraints(
         modifier = Modifier
@@ -38,10 +41,14 @@ fun ChessBoardView(viewModel: ChessViewModel) {
             for (row in 0 until 8) {
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     for (col in 0 until 8) {
-                        val isLightSquare = (row + col) % 2 == 0
+                        // for flipboard
+                        val displayRow = if (isFlipped)  7 - row else row
+                        val displayCol = if (isFlipped)  7- col else col
+
+                        val isLightSquare = (displayRow + displayCol) % 2 == 0
                         val squareColor = if (isLightSquare) LightSquareColor else DarkSquareColor
 
-                        val currentPosition = BoardPosition(row, col)
+                        val currentPosition = BoardPosition(displayRow, displayCol)
                         val pieceOnSquare = boardState[currentPosition]
 
                         Box(
@@ -73,13 +80,16 @@ fun ChessBoardView(viewModel: ChessViewModel) {
                                                 onDragEnd = {
                                                     isDragging = false
 
+                                                    // if board flipped reverse dragging calculation
+                                                    val directionMultiplier = if (isFlipped) -1 else 1
+
                                                     // Calculate how many squares the piece was dragged
-                                                    val colOffset = (offsetX / squareSizePx).roundToInt()
-                                                    val rowOffset = (offsetY / squareSizePx).roundToInt()
+                                                    val colOffset = (offsetX / squareSizePx).roundToInt() * directionMultiplier
+                                                    val rowOffset = (offsetY / squareSizePx).roundToInt() * directionMultiplier
 
                                                     // Determine the target position
-                                                    val targetRow = row + rowOffset
-                                                    val targetCol = col + colOffset
+                                                    val targetRow = displayRow + rowOffset
+                                                    val targetCol = displayCol + colOffset
 
                                                     // Validate if the move is within the board limits
                                                     if (targetRow in 0..7 && targetCol in 0..7) {

@@ -6,11 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-
+import androidx.compose.material3.Text
 
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.androchess.ui.ChessBoardView
@@ -25,8 +26,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AndroChessTheme {
+                val chessViewModel: ChessViewModel = viewModel()
+
                 // Scaffold provides the safe area padding
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    floatingActionButton = {
+                        FloatingActionButton(
+                            onClick = { chessViewModel.toggleBoardFlip() }
+                        ) {
+                            Text("FLIP") // TODO: turning arrows icon here
+                        }
+                    }
+
+                    ) { innerPadding ->
                     Surface(
                         // Apply the innerPadding here so the board doesn't overlap with the status bar
                         modifier = Modifier
@@ -35,7 +48,7 @@ class MainActivity : ComponentActivity() {
                         color = MaterialTheme.colorScheme.background
                     ) {
                         // Instantiate the ViewModel using the Compose Lifecycle function
-                        val chessViewModel: ChessViewModel = viewModel()
+                        // val chessViewModel: ChessViewModel = viewModel()
 
                         // Pass the ViewModel to our board view
                         ChessBoardView(viewModel = chessViewModel)

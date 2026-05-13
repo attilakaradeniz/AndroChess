@@ -16,6 +16,14 @@ class ChessViewModel : ViewModel() {
     // Exposes the immutable state to the UI
     val boardState: StateFlow<Map<BoardPosition, ChessPiece>> = _boardState.asStateFlow()
 
+    private val _isBoardFlipped = MutableStateFlow(false)
+    val isBoardFlipped: StateFlow<Boolean> = _isBoardFlipped.asStateFlow()
+
+    fun toggleBoardFlip() {
+        _isBoardFlipped.value = !_isBoardFlipped.value
+    }
+
+
     // Handles the logic of moving a piece from one square to another
     fun movePiece(from: BoardPosition, to: BoardPosition) {
         val currentBoard = _boardState.value.toMutableMap()
