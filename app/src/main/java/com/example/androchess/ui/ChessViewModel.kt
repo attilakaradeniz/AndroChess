@@ -11,6 +11,8 @@ import com.example.androchess.domain.isValidMove
 import com.example.androchess.domain.ChessMove
 
 import com.example.androchess.domain.ChessColor
+import com.example.androchess.domain.PieceType
+
 class ChessViewModel : ViewModel() {
 
     // Holds the private mutable state of the board
@@ -51,9 +53,22 @@ class ChessViewModel : ViewModel() {
             val move = ChessMove(pieceToMove, from, to, capturedPiece)
             _moveHistory.value = _moveHistory.value + move
 
+            // pawn promootion logic (for now auto queen) TODO: extend to underpromotion
+            var pieceToPlace = pieceToMove
+
+            // if a pawn reaches to the 0th row (w) or 7th row (b) promote to queen
+            if (pieceToMove.type == PieceType.PAWN) {
+                if ((pieceToMove.color == ChessColor.WHITE && to.row == 0) ||
+                    (pieceToMove.color == ChessColor.BLACK && to.row == 7)) {
+                    pieceToPlace = ChessPiece(PieceType.QUEEN, pieceToMove.color)
+                }
+            }
+
+
             // execute the move on board
             currentBoard.remove(from)
-            currentBoard[to] = pieceToMove
+            //currentBoard[to] = pieceToMove
+            currentBoard[to] = pieceToPlace
             _boardState.value = currentBoard
 
             // Switch the turn after a successful move
