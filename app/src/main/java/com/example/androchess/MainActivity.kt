@@ -8,12 +8,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface // Added missing import
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.example.androchess.domain.createInitialBoard
-// Corrected the path for ChessBoardView
+
+
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.androchess.ui.theme.ChessBoardView
+
+
 import com.example.androchess.ui.theme.AndroChessTheme
+import com.example.androchess.ui.theme.ChessViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,10 +34,11 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        // Create the initial state
-                        val initialBoardState = createInitialBoard()
-                        // Draw chess board
-                        ChessBoardView(boardState = initialBoardState)
+                        // Instantiate the ViewModel using the Compose Lifecycle function
+                        val chessViewModel: ChessViewModel = viewModel()
+
+                        // Pass the ViewModel to our board view
+                        ChessBoardView(viewModel = chessViewModel)
                     }
                 }
             }
