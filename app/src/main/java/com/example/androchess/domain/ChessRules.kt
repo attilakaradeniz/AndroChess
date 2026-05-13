@@ -33,8 +33,25 @@ fun isValidMove(
         }
         PieceType.KING -> {
             // King: every direction only one step
-            absRowDiff <= 1 && absColDiff <= 1
+            if (absRowDiff <= 1 && absColDiff <= 1) return true
+
+            // castling
+            // if king hasnt moved & can move two square left/right
+            if (rowDiff == 0 && absColDiff == 2 && !piece.hasMoved) {
+                val isKingside = to.col > from.col // Sağa (Kısa) mı, Sola (Uzun) mu?
+                val rookCol = if (isKingside) 7 else 0
+                val rookPos = BoardPosition(from.row, rookCol)
+                val rook = board[rookPos]
+
+                // is piece at the corner a rook and hasnt move yet
+                if (rook != null && rook.type == PieceType.ROOK && !rook.hasMoved) {
+                    // is the path between king & rook clear
+                    return isPathClear(board, from, rookPos)
+                }
+            }
+            false
         }
+
         PieceType.ROOK -> {
             // Rook: whether a file or row change not both, plus only open path
             (rowDiff == 0 || colDiff == 0) && isPathClear(board, from, to)
@@ -61,8 +78,11 @@ fun isValidMove(
             // diagonal capture
             // now plus En Passant
             // else if (absColDiff == 1 && rowDiff == direction ) {
-             else if (absColDiff == 1 && rowDiff == direction && targetPiece == null ) {
-                 // now have to chech if the last move was a pwn moving two squares
+            else if (absColDiff == 1 && rowDiff == direction && targetPiece != null && targetPiece.color != piece.color ) {
+                return true
+            }
+            else if (absColDiff == 1 && rowDiff == direction && targetPiece == null) {
+                // now have to chech if the last move was a pwn moving two squares
                 if (lastMove != null && lastMove.piece.type == PieceType.PAWN) {
                     val lastMoveRowDiff = abs(lastMove.to.row - lastMove.from.row)
                     // Did it move 2 squares?
@@ -101,4 +121,3 @@ private fun isPathClear(
     }
     return true
 }
-

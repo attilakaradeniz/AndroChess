@@ -11,6 +11,11 @@ fun BoardPosition.toAlgebraic(): String {
 
 // Converts a single ChessMove into standard PGN notation
 fun ChessMove.toPGN(): String {
+    // castling notation (O-O or O-O-O)
+    if (this.isCastling) {
+    return if (this.to.col > this.from.col) "O-O" else "O-O-O"
+    }
+
     // Determine the piece letter
     val pieceStr = when (this.piece.type) {
         PieceType.PAWN -> "" // Pawns don't have a letter in PGN

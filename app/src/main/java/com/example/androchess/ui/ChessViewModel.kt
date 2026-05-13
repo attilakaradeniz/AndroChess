@@ -12,6 +12,8 @@ import com.example.androchess.domain.ChessMove
 
 import com.example.androchess.domain.ChessColor
 import com.example.androchess.domain.PieceType
+import kotlin.text.set
+import kotlin.to
 
 class ChessViewModel : ViewModel() {
 
@@ -51,6 +53,7 @@ class ChessViewModel : ViewModel() {
             // to hold captured piece if there is one
             var capturedPiece = currentBoard[to]
             var isEnPassant = false
+            var isCastling = false
             var enPassantCapturedPos: BoardPosition? = null
 
             // Detect if this valid move is an En Passant execution
@@ -62,13 +65,27 @@ class ChessViewModel : ViewModel() {
                 capturedPiece = currentBoard[enPassantCapturedPos]
             }
 
+            if (pieceToMove.type == PieceType.KING && kotlin.math.abs(from.col - to.col) ==2) {
+                isCastling = true
+            }
+
             // save the move
-            val move = ChessMove(pieceToMove, from, to, capturedPiece, isEnPassant)
+            // val move = ChessMove(pieceToMove, from, to, capturedPiece, isEnPassant)
+
+            // changed to
+            val move = ChessMove(
+                piece = pieceToMove,
+                from = from,
+                to = to,
+                capturedPiece = capturedPiece,
+                inEnPassant = isEnPassant, // Modelinde adı inEnPassant olarak kalmış
+                isCastling = isCastling    // İŞTE EKSİK OLAN HAYATİ PARÇA!
+            )
+
             _moveHistory.value = _moveHistory.value + move
 
             // pawn promootion logic (for now auto queen) TODO: extend to underpromotion
             var pieceToPlace = pieceToMove
-
              // if a pawn reaches to the 0th row (w) or 7th row (b) promote to queen
             if (pieceToMove.type == PieceType.PAWN) {
                 if ((pieceToMove.color == ChessColor.WHITE && to.row == 0) ||
@@ -77,10 +94,11 @@ class ChessViewModel : ViewModel() {
                 }
             }
 
+            // the flag now is moved
+            pieceToPlace = pieceToPlace.copy(hasMoved = true)
 
             // execute the move on board
             currentBoard.remove(from)
-            //currentBoard[to] = pieceToMove
             currentBoard[to] = pieceToPlace
 
             // NEW: Remove the ghost pawn that was captured via En Passant
@@ -88,8 +106,24 @@ class ChessViewModel : ViewModel() {
                 currentBoard.remove(enPassantCapturedPos)
             }
 
-            _boardState.value = currentBoard
+            // castling execution
+            if (isCastling) {
+                val isKingside = to.col > from.col
+                val rookStartCol = if (isKingside) 7 else 0
+                val rookEndCol = if (isKingside) to.col - 1 else to.col + 1
 
+                val rookStartPos = BoardPosition(from.row, rookStartCol)
+                val rookEndPos = BoardPosition(from.row, rookEndCol)
+
+                val rook = currentBoard[rookStartPos]
+                if (rook != null) {
+                    currentBoard.remove(rookStartPos)
+                    // flag rook as 'moved' & move
+                    currentBoard[rookEndPos] = rook.copy(hasMoved = true)
+                }
+            }
+
+            _boardState.value = currentBoard
             // Switch the turn after a successful move
             _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
 
@@ -104,13 +138,27 @@ class ChessViewModel : ViewModel() {
 
         // take back the moved piece to its old square
         currentBoard[lastMove.from] = lastMove.piece
-
         // remove the piece on its own new square
         currentBoard.remove(lastMove.to)
 
-        // if a piece capture happened pull alive and put it on target square
-        if (lastMove.capturedPiece != null) {
-            // UPDATED: Put the captured pawn back to its correct square if it was En Passant
+        if (lastMove.isCastling) {
+            val isKingside = lastMove.to.col > lastMove.from.col
+            val rookCurrentCol = if (isKingside) 5 else 3 // the square for rook after castling
+            val rookOriginalCol = if (isKingside) 7 else 0 // rooks original square
+
+            val rookCurrentPos = BoardPosition(lastMove.from.row, rookCurrentCol)
+            val rookOriginalPos = BoardPosition(lastMove.from.row, rookOriginalCol)
+
+            val rook = currentBoard[rookCurrentPos]
+            if (rook != null) {
+                currentBoard.remove(rookCurrentPos)
+                currentBoard[rookOriginalPos] = rook.copy(hasMoved = false)
+            }
+        }
+
+        // common piece capture or en passant cases
+        if (lastMove.capturedPiece != null && !lastMove.isCastling) {
+
             if (lastMove.inEnPassant) {
                 val originalPawnPosition = BoardPosition(lastMove.from.row, lastMove.to.col)
                 currentBoard[originalPawnPosition] = lastMove.capturedPiece
@@ -118,6 +166,26 @@ class ChessViewModel : ViewModel() {
                 currentBoard[lastMove.to] = lastMove.capturedPiece
             }
         }
+
+//            val rookStartCol = if (isKingside) 7 else 0
+//            val rookEndCol = if (isKingside) lastMove.to.col - 1 else lastMove.to.col + 1
+
+//            val rookStartPos = BoardPosition(lastMove.from.row, rookStartCol)
+//            val rookEndPos = BoardPosition(lastMove.from.row, rookEndCol)
+
+//            val rook = currentBoard[rookEndPos]
+//            if (rook != null) {
+//                currentBoard.remove(rookEndPos)
+//                // move rook its originated square & flag as not moved yet
+//                currentBoard[rookStartPos] = rook.copy(hasMoved = false)
+ //           }
+ //       }
+
+
+
+        // undo castling
+
+
         _boardState.value = currentBoard
         _moveHistory.value = history.dropLast(1)
         // Switch the turn back

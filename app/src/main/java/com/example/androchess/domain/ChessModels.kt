@@ -13,7 +13,8 @@ enum class PieceType {
 // Represents a specific chess piece with its type and color
 data class ChessPiece(
     val type: PieceType,
-    val color: ChessColor
+    val color: ChessColor,
+    val hasMoved: Boolean = false // required for castling
 )
 
 // Represents a position on the 8x8 chess board
@@ -31,5 +32,7 @@ data class ChessMove(
     val to: BoardPosition, // target
     val capturedPiece: ChessPiece?, // if there is one, otherwise NULL
     // en passant mark (necessary to know in case of undoing correctly
-    val inEnPassant: Boolean = false
+    val inEnPassant: Boolean = false,
+    // required for undoing castling
+    val isCastling: Boolean = false
 )
