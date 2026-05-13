@@ -9,11 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.example.androchess.domain.isValidMove
 import com.example.androchess.domain.ChessMove
+
+import com.example.androchess.domain.ChessColor
 class ChessViewModel : ViewModel() {
 
     // Holds the private mutable state of the board
     private val _boardState = MutableStateFlow(createInitialBoard())
-
     // Exposes the immutable state to the UI
     val boardState: StateFlow<Map<BoardPosition, ChessPiece>> = _boardState.asStateFlow()
 
@@ -22,6 +23,10 @@ class ChessViewModel : ViewModel() {
 
     private val _moveHistory = MutableStateFlow<List<ChessMove>>(emptyList())
     val moveHistory: StateFlow<List<ChessMove>> = _moveHistory.asStateFlow()
+
+    // White moves first
+    private val _currentTurn = MutableStateFlow(ChessColor.WHITE)
+    val currentTurn: StateFlow<ChessColor> = _currentTurn.asStateFlow()
 
     fun toggleBoardFlip() {
         _isBoardFlipped.value = !_isBoardFlipped.value
@@ -33,7 +38,12 @@ class ChessViewModel : ViewModel() {
         val currentBoard = _boardState.value.toMutableMap()
         val pieceToMove = currentBoard[from]
 
-        if (pieceToMove != null && isValidMove(currentBoard, from, to)) {
+        // check if piece exists
+        //check if its the correct players turn
+        // check if the move is valid
+
+
+        if (pieceToMove != null && pieceToMove.color ==_currentTurn.value &&  isValidMove(currentBoard, from, to)) {
             // to hold captured piece if there is one
             val capturedPiece = currentBoard[to]
 
@@ -46,27 +56,10 @@ class ChessViewModel : ViewModel() {
             currentBoard[to] = pieceToMove
             _boardState.value = currentBoard
 
+            // Switch the turn after a successful move
+            _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
+
         }
-
-//        // If there is a piece to move, execute the move
-//        if (pieceToMove != null) {
-//
-//            if (isValidMove(currentBoard, from, to)) {
-//                currentBoard.remove(from)
-//                currentBoard[to] = pieceToMove
-//                // Update the state, triggering a UI recomposition
-//                _boardState.value = currentBoard
-//            } else {
-//               // DO NOTHING
-//               // leave the state what it is
-//            }
-//
-//
-//
-//        }
-
-        // rewind back
-
     }
     fun undoLastMove() {
         val history = _moveHistory.value
@@ -87,6 +80,9 @@ class ChessViewModel : ViewModel() {
         }
         _boardState.value = currentBoard
         _moveHistory.value = history.dropLast(1)
+
+        // Switch the turn back
+        _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
 
     }
 }
