@@ -36,3 +36,9 @@ data class ChessMove(
     // required for undoing castling
     val isCastling: Boolean = false
 )
+
+// Represents events that happen during the game (like playing a sound)
+sealed class GameEvent {
+    object Move : GameEvent()
+    object Capture : GameEvent()
+}

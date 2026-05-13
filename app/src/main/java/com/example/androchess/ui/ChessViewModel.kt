@@ -15,6 +15,12 @@ import com.example.androchess.domain.PieceType
 import kotlin.text.set
 import kotlin.to
 
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+import com.example.androchess.domain.GameEvent
+
 class ChessViewModel : ViewModel() {
 
     // Holds the private mutable state of the board
@@ -31,6 +37,13 @@ class ChessViewModel : ViewModel() {
     // White moves first
     private val _currentTurn = MutableStateFlow(ChessColor.WHITE)
     val currentTurn: StateFlow<ChessColor> = _currentTurn.asStateFlow()
+
+
+
+    private val _gameEvents = MutableSharedFlow<GameEvent>()
+    val gameEvents = _gameEvents.asSharedFlow()
+
+
 
     fun toggleBoardFlip() {
         _isBoardFlipped.value = !_isBoardFlipped.value
@@ -126,6 +139,14 @@ class ChessViewModel : ViewModel() {
             _boardState.value = currentBoard
             // Switch the turn after a successful move
             _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
+            viewModelScope.launch {
+                // If a piece was captured normally, or via En Passant
+                if (capturedPiece != null || isEnPassant) {
+                    _gameEvents.emit(GameEvent.Capture)
+                } else {
+                    _gameEvents.emit(GameEvent.Move)
+                }
+            }
 
         }
     }

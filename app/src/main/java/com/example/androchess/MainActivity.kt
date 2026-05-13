@@ -32,6 +32,12 @@ import android.widget.Toast
 // import PGN conv from domain package
 import com.example.androchess.domain.toPGNString
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import com.example.androchess.ui.SoundManager
+import com.example.androchess.domain.GameEvent
+
 
 
 
@@ -43,6 +49,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             AndroChessTheme {
                 val chessViewModel: ChessViewModel = viewModel()
+
+                val context = LocalContext.current
+                val soundManager = remember { SoundManager(context) }
+                // NEW: Listen for game events (sounds) from the ViewModel
+                LaunchedEffect(Unit) {
+                    chessViewModel.gameEvents.collect { event ->
+                        when (event) {
+                            is GameEvent.Move -> soundManager.playMoveSound()
+                            is GameEvent.Capture -> soundManager.playCaptureSound()
+                        }
+                    }
+                }
+
 
                 // Scaffold provides the safe area padding
                 Scaffold(
