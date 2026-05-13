@@ -39,24 +39,37 @@ class ChessViewModel : ViewModel() {
     fun movePiece(from: BoardPosition, to: BoardPosition) {
         val currentBoard = _boardState.value.toMutableMap()
         val pieceToMove = currentBoard[from]
-
+        // get to last move & chech whether it was en Passant or not
+        val lastMove = _moveHistory.value.lastOrNull()
         // check if piece exists
         //check if its the correct players turn
         // check if the move is valid
 
 
-        if (pieceToMove != null && pieceToMove.color ==_currentTurn.value &&  isValidMove(currentBoard, from, to)) {
+
+        if (pieceToMove != null && pieceToMove.color ==_currentTurn.value &&  isValidMove(currentBoard, from, to , lastMove)) {
             // to hold captured piece if there is one
-            val capturedPiece = currentBoard[to]
+            var capturedPiece = currentBoard[to]
+            var isEnPassant = false
+            var enPassantCapturedPos: BoardPosition? = null
+
+            // Detect if this valid move is an En Passant execution
+            // A pawn moving diagonally to an empty square is definitively an En Passant
+
+            if (pieceToMove.type == PieceType.PAWN && from.col != to.col && currentBoard[to] == null) {
+                isEnPassant = true
+                enPassantCapturedPos = BoardPosition(from.row, to.col) // the square beside our pawn
+                capturedPiece = currentBoard[enPassantCapturedPos]
+            }
 
             // save the move
-            val move = ChessMove(pieceToMove, from, to, capturedPiece)
+            val move = ChessMove(pieceToMove, from, to, capturedPiece, isEnPassant)
             _moveHistory.value = _moveHistory.value + move
 
             // pawn promootion logic (for now auto queen) TODO: extend to underpromotion
             var pieceToPlace = pieceToMove
 
-            // if a pawn reaches to the 0th row (w) or 7th row (b) promote to queen
+             // if a pawn reaches to the 0th row (w) or 7th row (b) promote to queen
             if (pieceToMove.type == PieceType.PAWN) {
                 if ((pieceToMove.color == ChessColor.WHITE && to.row == 0) ||
                     (pieceToMove.color == ChessColor.BLACK && to.row == 7)) {
@@ -69,6 +82,12 @@ class ChessViewModel : ViewModel() {
             currentBoard.remove(from)
             //currentBoard[to] = pieceToMove
             currentBoard[to] = pieceToPlace
+
+            // NEW: Remove the ghost pawn that was captured via En Passant
+            if (isEnPassant && enPassantCapturedPos != null) {
+                currentBoard.remove(enPassantCapturedPos)
+            }
+
             _boardState.value = currentBoard
 
             // Switch the turn after a successful move
@@ -91,11 +110,16 @@ class ChessViewModel : ViewModel() {
 
         // if a piece capture happened pull alive and put it on target square
         if (lastMove.capturedPiece != null) {
-            currentBoard[lastMove.to] = lastMove.capturedPiece
+            // UPDATED: Put the captured pawn back to its correct square if it was En Passant
+            if (lastMove.inEnPassant) {
+                val originalPawnPosition = BoardPosition(lastMove.from.row, lastMove.to.col)
+                currentBoard[originalPawnPosition] = lastMove.capturedPiece
+            } else {
+                currentBoard[lastMove.to] = lastMove.capturedPiece
+            }
         }
         _boardState.value = currentBoard
         _moveHistory.value = history.dropLast(1)
-
         // Switch the turn back
         _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
 

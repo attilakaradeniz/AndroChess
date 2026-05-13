@@ -2,12 +2,14 @@ package com.example.androchess.domain
 
 import kotlin.math.abs
 import kotlin.math.sign
+import com.example.androchess.domain.ChessMove
 
 // move validation func
 fun isValidMove(
     board: Map<BoardPosition, ChessPiece>,
     from: BoardPosition,
-    to: BoardPosition
+    to: BoardPosition,
+    lastMove: ChessMove? = null
 ): Boolean {
     val piece = board[from] ?: return false
     val targetPiece = board[to]
@@ -57,11 +59,23 @@ fun isValidMove(
                 if (from.row == startRow && rowDiff == direction * 2 && targetPiece == null && board[BoardPosition(from.row + direction, from.col)] == null) return true // two square on first move
             }
             // diagonal capture
-            else if (absColDiff == 1 && rowDiff == direction) {
-                if (targetPiece != null && targetPiece.color != piece.color) return true // captures opponent
+            // now plus En Passant
+            // else if (absColDiff == 1 && rowDiff == direction ) {
+             else if (absColDiff == 1 && rowDiff == direction && targetPiece == null ) {
+                 // now have to chech if the last move was a pwn moving two squares
+                if (lastMove != null && lastMove.piece.type == PieceType.PAWN) {
+                    val lastMoveRowDiff = abs(lastMove.to.row - lastMove.from.row)
+                    // Did it move 2 squares?
+                    // is it right next to our pawn?
+                    // is it on the destination column?
+                    if (lastMoveRowDiff == 2 && lastMove.to.row == from.row && lastMove.to.col == to.col) {
+                        return true
+                    }
+                }
             }
             false
         }
+        else -> false // special debug case
     }
 }
 

@@ -29,5 +29,7 @@ data class ChessMove(
     val piece: ChessPiece, // moving/moved piece
     val from: BoardPosition, // destination
     val to: BoardPosition, // target
-    val capturedPiece: ChessPiece? // if there is one, otherwise NULL
+    val capturedPiece: ChessPiece?, // if there is one, otherwise NULL
+    // en passant mark (necessary to know in case of undoing correctly
+    val inEnPassant: Boolean = false
 )
