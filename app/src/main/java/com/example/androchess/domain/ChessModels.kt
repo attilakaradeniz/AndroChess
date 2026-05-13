@@ -23,3 +23,11 @@ data class BoardPosition(
     val row: Int,
     val col: Int
 )
+
+// to hold move history & captured pieces
+data class ChessMove(
+    val piece: ChessPiece, // moving/moved piece
+    val from: BoardPosition, // destination
+    val to: BoardPosition, // target
+    val capturedPiece: ChessPiece? // if there is one, otherwise NULL
+)

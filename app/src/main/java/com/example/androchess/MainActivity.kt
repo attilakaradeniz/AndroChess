@@ -20,6 +20,14 @@ import com.example.androchess.ui.ChessBoardView
 import com.example.androchess.ui.theme.AndroChessTheme
 import com.example.androchess.ui.ChessViewModel
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.unit.dp
+
+
+
+
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,14 +40,22 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     floatingActionButton = {
-                        FloatingActionButton(
-                            onClick = { chessViewModel.toggleBoardFlip() }
-                        ) {
-                            Text("FLIP") // TODO: turning arrows icon here
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FloatingActionButton(
+                                onClick = { chessViewModel.undoLastMove() }
+                            ) {
+                                Text("UNDO")
+                            }
+
+                            FloatingActionButton(
+                                onClick = { chessViewModel.toggleBoardFlip() }
+                            ) {
+                                Text("FLIP") // TODO: turning arrows icon here
+                            }
                         }
                     }
 
-                    ) { innerPadding ->
+                ) { innerPadding ->
                     Surface(
                         // Apply the innerPadding here so the board doesn't overlap with the status bar
                         modifier = Modifier

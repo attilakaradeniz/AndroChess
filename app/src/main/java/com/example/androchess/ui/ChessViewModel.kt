@@ -7,7 +7,8 @@ import com.example.androchess.domain.createInitialBoard
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
+import com.example.androchess.domain.isValidMove
+import com.example.androchess.domain.ChessMove
 class ChessViewModel : ViewModel() {
 
     // Holds the private mutable state of the board
@@ -19,6 +20,9 @@ class ChessViewModel : ViewModel() {
     private val _isBoardFlipped = MutableStateFlow(false)
     val isBoardFlipped: StateFlow<Boolean> = _isBoardFlipped.asStateFlow()
 
+    private val _moveHistory = MutableStateFlow<List<ChessMove>>(emptyList())
+    val moveHistory: StateFlow<List<ChessMove>> = _moveHistory.asStateFlow()
+
     fun toggleBoardFlip() {
         _isBoardFlipped.value = !_isBoardFlipped.value
     }
@@ -29,13 +33,60 @@ class ChessViewModel : ViewModel() {
         val currentBoard = _boardState.value.toMutableMap()
         val pieceToMove = currentBoard[from]
 
-        // If there is a piece to move, execute the move
-        if (pieceToMove != null) {
+        if (pieceToMove != null && isValidMove(currentBoard, from, to)) {
+            // to hold captured piece if there is one
+            val capturedPiece = currentBoard[to]
+
+            // save the move
+            val move = ChessMove(pieceToMove, from, to, capturedPiece)
+            _moveHistory.value = _moveHistory.value + move
+
+            // execute the move on board
             currentBoard.remove(from)
             currentBoard[to] = pieceToMove
-
-            // Update the state, triggering a UI recomposition
             _boardState.value = currentBoard
+
         }
+
+//        // If there is a piece to move, execute the move
+//        if (pieceToMove != null) {
+//
+//            if (isValidMove(currentBoard, from, to)) {
+//                currentBoard.remove(from)
+//                currentBoard[to] = pieceToMove
+//                // Update the state, triggering a UI recomposition
+//                _boardState.value = currentBoard
+//            } else {
+//               // DO NOTHING
+//               // leave the state what it is
+//            }
+//
+//
+//
+//        }
+
+        // rewind back
+
+    }
+    fun undoLastMove() {
+        val history = _moveHistory.value
+        if (history.isEmpty()) return // if there is no move to rewind DO NOTHING
+
+        val lastMove = history.last()
+        val currentBoard = _boardState.value.toMutableMap()
+
+        // take back the moved piece to its old square
+        currentBoard[lastMove.from] = lastMove.piece
+
+        // remove the piece on its own new square
+        currentBoard.remove(lastMove.to)
+
+        // if a piece capture happened pull alive and put it on target square
+        if (lastMove.capturedPiece != null) {
+            currentBoard[lastMove.to] = lastMove.capturedPiece
+        }
+        _boardState.value = currentBoard
+        _moveHistory.value = history.dropLast(1)
+
     }
 }
