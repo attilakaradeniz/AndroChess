@@ -1,5 +1,4 @@
-package com.example.androchess.ui.theme
-
+package com.example.androchess.ui
 
 import androidx.lifecycle.ViewModel
 import com.example.androchess.domain.BoardPosition

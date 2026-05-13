@@ -1,4 +1,4 @@
-package com.example.androchess.ui.theme
+package com.example.androchess.ui
 
 import com.example.androchess.R
 import com.example.androchess.domain.ChessColor

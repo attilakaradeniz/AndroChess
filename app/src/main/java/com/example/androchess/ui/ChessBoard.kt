@@ -1,4 +1,4 @@
-package com.example.androchess.ui.theme
+package com.example.androchess.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -14,8 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.androchess.domain.BoardPosition
 import kotlin.math.roundToInt
-import com.example.androchess.ui.theme.ChessViewModel
-import com.example.androchess.ui.theme.getPieceDrawable
+import com.example.androchess.ui.ChessViewModel
 
 val LightSquareColor = Color(0xFFEBECD0)
 val DarkSquareColor = Color(0xFF779556)

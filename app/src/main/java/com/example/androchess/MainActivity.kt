@@ -13,11 +13,11 @@ import androidx.compose.ui.Modifier
 
 
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.androchess.ui.theme.ChessBoardView
+import com.example.androchess.ui.ChessBoardView
 
 
 import com.example.androchess.ui.theme.AndroChessTheme
-import com.example.androchess.ui.theme.ChessViewModel
+import com.example.androchess.ui.ChessViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
