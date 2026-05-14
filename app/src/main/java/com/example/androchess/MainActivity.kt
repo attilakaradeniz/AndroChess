@@ -38,9 +38,14 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.androchess.ui.SoundManager
 import com.example.androchess.domain.GameEvent
 
-
-
-
+// --- EKSİK İMPORTLAR BURAYA GELDİ ---
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.collectAsState
+// ------------------------------------
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -121,12 +126,32 @@ class MainActivity : ComponentActivity() {
                     ) {
                         // Instantiate the ViewModel using the Compose Lifecycle function
                         // val chessViewModel: ChessViewModel = viewModel()
+                        // YENİ: Tahta ve Hamle Listesini alt alta dizmek için Column kullanıyoruz
+                        Column(modifier = Modifier.fillMaxSize()) {
 
-                        // Pass the ViewModel to our board view
-                        ChessBoardView(viewModel = chessViewModel)
+                            // Pass the ViewModel to our board view
+                            ChessBoardView(viewModel = chessViewModel)
+
+                            // Altta Hamle Listesi (Scroll edilebilir metin kutusu)
+                            val moveHistory = chessViewModel.moveHistory.collectAsState().value
+                            val pgnText = moveHistory.toPGNString()
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f) // Kalan tüm boşluğu kapla
+                                    .padding(16.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                Text(
+                                    text = if (pgnText.isEmpty()) "Game started. Make a move!" else pgnText,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
                     }
                 }
-            }
-        }
-    }
-}
+            } // AndroChessTheme kapanışı
+        } // setContent kapanışı
+    } // onCreate kapanışı
+} // MainActivity kapanışı
