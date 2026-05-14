@@ -97,6 +97,11 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 Text("UNDO")
                             }
+                            FloatingActionButton(
+                                onClick = { chessViewModel.redoLastMove() }
+                            ) {
+                                Text("REDO")
+                            }
 
                             FloatingActionButton(
                                 onClick = { chessViewModel.toggleBoardFlip() }

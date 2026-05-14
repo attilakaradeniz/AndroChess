@@ -40,12 +40,11 @@ class ChessViewModel : ViewModel() {
     // White moves first
     private val _currentTurn = MutableStateFlow(ChessColor.WHITE)
     val currentTurn: StateFlow<ChessColor> = _currentTurn.asStateFlow()
-
-
-
     private val _gameEvents = MutableSharedFlow<GameEvent>()
     val gameEvents = _gameEvents.asSharedFlow()
 
+    private val _redoStack = MutableStateFlow<List<ChessMove>>(emptyList())
+    val redoStack: StateFlow<List<ChessMove>> = _redoStack.asStateFlow()
 
 
     fun toggleBoardFlip() {
@@ -110,6 +109,9 @@ class ChessViewModel : ViewModel() {
                 isCastling = isCastling
             )
             _moveHistory.value = _moveHistory.value + move
+
+            // clear in the event of every new move
+            _redoStack.value = emptyList()
 
             pieceToPlace = pieceToPlace.copy(hasMoved = true)
 
@@ -225,9 +227,72 @@ class ChessViewModel : ViewModel() {
 
 
         _boardState.value = currentBoard
+
+        // YENİ: Geri alınan hamleyi çöpe atma, Redo (gelecek) kutusuna koy
+        _redoStack.value = _redoStack.value + lastMove
+
         _moveHistory.value = history.dropLast(1)
         // Switch the turn back
         _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
 
+    }
+
+    fun redoLastMove() {
+        val future = _redoStack.value
+        if (future.isEmpty()) return // Gidilecek bir gelecek yoksa dur
+
+        val moveToRedo = future.last()
+        val currentBoard = _boardState.value.toMutableMap()
+
+        // 1. Taşı eski yerinden kaldır
+        currentBoard.remove(moveToRedo.from)
+
+        // 2. Terfi (Promotion) kontrolü
+        var pieceToPlace = moveToRedo.piece
+        if (pieceToPlace.type == PieceType.PAWN) {
+            if ((pieceToPlace.color == ChessColor.WHITE && moveToRedo.to.row == 0) ||
+                (pieceToPlace.color == ChessColor.BLACK && moveToRedo.to.row == 7)) {
+                pieceToPlace = ChessPiece(PieceType.QUEEN, pieceToPlace.color)
+            }
+        }
+        pieceToPlace = pieceToPlace.copy(hasMoved = true)
+
+        // 3. Taşı yeni yerine koy
+        currentBoard[moveToRedo.to] = pieceToPlace
+
+        // 4. En Passant ile yenmiş hayalet taşı sil
+        if (moveToRedo.inEnPassant) {
+            val capturedPawnPos = BoardPosition(moveToRedo.from.row, moveToRedo.to.col)
+            currentBoard.remove(capturedPawnPos)
+        }
+
+        // 5. Rok atılmışsa Kaleyi de ışınla
+        if (moveToRedo.isCastling) {
+            val isKingside = moveToRedo.to.col > moveToRedo.from.col
+            val rookStartCol = if (isKingside) 7 else 0
+            val rookEndCol = if (isKingside) moveToRedo.to.col - 1 else moveToRedo.to.col + 1
+            val rookStartPos = BoardPosition(moveToRedo.from.row, rookStartCol)
+            val rookEndPos = BoardPosition(moveToRedo.from.row, rookEndCol)
+            val rook = currentBoard[rookStartPos]
+            if (rook != null) {
+                currentBoard.remove(rookStartPos)
+                currentBoard[rookEndPos] = rook.copy(hasMoved = true)
+            }
+        }
+
+        // 6. State'leri güncelle (Geçmişe ekle, Gelecekten sil)
+        _boardState.value = currentBoard
+        _moveHistory.value = _moveHistory.value + moveToRedo
+        _redoStack.value = future.dropLast(1)
+        _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
+
+        // 7. Hamle ileri sarılırken de kılıç sesleri çıksın!
+        viewModelScope.launch {
+            if (moveToRedo.capturedPiece != null || moveToRedo.inEnPassant) {
+                _gameEvents.emit(GameEvent.Capture)
+            } else {
+                _gameEvents.emit(GameEvent.Move)
+            }
+        }
     }
 }
