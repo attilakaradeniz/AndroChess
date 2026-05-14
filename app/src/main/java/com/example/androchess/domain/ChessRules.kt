@@ -38,7 +38,18 @@ fun isValidMove(
             // castling
             // if king hasnt moved & can move two square left/right
             if (rowDiff == 0 && absColDiff == 2 && !piece.hasMoved) {
-                val isKingside = to.col > from.col // Sağa (Kısa) mı, Sola (Uzun) mu?
+                val enemyColor = if (piece.color == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
+
+                // Rule 1: Cannot castle out of check
+                if (isSquareAttacked(board, from, enemyColor)) return false
+
+                val isKingside = to.col > from.col
+                val step = if (isKingside) 1 else -1
+                val passedSquare = BoardPosition(from.row, from.col + step)
+
+                // Rule 2: Cannot castle through check
+                if (isSquareAttacked(board, passedSquare, enemyColor)) return false
+
                 val rookCol = if (isKingside) 7 else 0
                 val rookPos = BoardPosition(from.row, rookCol)
                 val rook = board[rookPos]
@@ -49,8 +60,8 @@ fun isValidMove(
                     return isPathClear(board, from, rookPos)
                 }
             }
-            false
-        }
+            false // <-- İŞTE KAYIP OLAN DÖNÜŞ DEĞERİ
+        } // <-- VE İŞTE SİSTEMİ ÇÖKERTEN KAYIP PARANTEZ!
 
         PieceType.ROOK -> {
             // Rook: whether a file or row change not both, plus only open path
@@ -120,4 +131,62 @@ private fun isPathClear(
         currentCol += colStep
     }
     return true
+}
+
+// check if a specific square is under attack by the given color
+fun isSquareAttacked(
+    board: Map<BoardPosition, ChessPiece>,
+    targetSquare: BoardPosition,
+    attackerColor: ChessColor
+): Boolean {
+    for ((pos, piece) in board) {
+        if (piece.color == attackerColor) {
+            // We use isValidMove to check if the attacker can geometrically hit the square.
+            if (isValidMove(board, pos, targetSquare, null)) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+// check if the king of the given color is in check
+fun isKingInCheck(board: Map<BoardPosition, ChessPiece>, color: ChessColor): Boolean {
+    // Find the king's position
+    val kingPos = board.entries.find { it.value.type == PieceType.KING && it.value.color == color }?.key ?: return false
+    val attackerColor = if (color == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
+
+    // Is the king's square attacked by the enemy?
+    return isSquareAttacked(board, kingPos, attackerColor)
+}
+
+// check if a player has ANY legal moves left (for Checkmate & Stalemate)
+fun hasLegalMoves(
+    board: Map<BoardPosition, ChessPiece>,
+    color: ChessColor,
+    lastMove: ChessMove?
+): Boolean {
+    for ((fromPos, piece) in board) {
+        if (piece.color == color) {
+            // Try moving this piece to every possible square on the board
+            for (row in 0..7) {
+                for (col in 0..7) {
+                    val toPos = BoardPosition(row, col)
+                    if (isValidMove(board, fromPos, toPos, lastMove)) {
+
+                        // Simulate the move
+                        val simulatedBoard = board.toMutableMap()
+                        simulatedBoard.remove(fromPos)
+                        simulatedBoard[toPos] = piece
+
+                        // If this move removes the check, we have at least one legal move!
+                        if (!isKingInCheck(simulatedBoard, color)) {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false // No legal moves found!
 }

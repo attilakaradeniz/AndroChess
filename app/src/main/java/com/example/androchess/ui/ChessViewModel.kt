@@ -1,5 +1,7 @@
 package com.example.androchess.ui
 
+import android.util.Log
+
 import androidx.lifecycle.ViewModel
 import com.example.androchess.domain.BoardPosition
 import com.example.androchess.domain.ChessPiece
@@ -12,14 +14,15 @@ import com.example.androchess.domain.ChessMove
 
 import com.example.androchess.domain.ChessColor
 import com.example.androchess.domain.PieceType
-import kotlin.text.set
-import kotlin.to
 
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import com.example.androchess.domain.GameEvent
+
+import com.example.androchess.domain.isKingInCheck
+import com.example.androchess.domain.hasLegalMoves
 
 class ChessViewModel : ViewModel() {
 
@@ -50,56 +53,34 @@ class ChessViewModel : ViewModel() {
     }
 
 
-    // Handles the logic of moving a piece from one square to another
+
+
+    // ...
     fun movePiece(from: BoardPosition, to: BoardPosition) {
         val currentBoard = _boardState.value.toMutableMap()
         val pieceToMove = currentBoard[from]
-        // get to last move & chech whether it was en Passant or not
         val lastMove = _moveHistory.value.lastOrNull()
-        // check if piece exists
-        //check if its the correct players turn
-        // check if the move is valid
 
-
-
-        if (pieceToMove != null && pieceToMove.color ==_currentTurn.value &&  isValidMove(currentBoard, from, to , lastMove)) {
-            // to hold captured piece if there is one
+        if (pieceToMove != null && pieceToMove.color == _currentTurn.value && isValidMove(currentBoard, from, to, lastMove)) {
             var capturedPiece = currentBoard[to]
             var isEnPassant = false
             var isCastling = false
             var enPassantCapturedPos: BoardPosition? = null
 
-            // Detect if this valid move is an En Passant execution
-            // A pawn moving diagonally to an empty square is definitively an En Passant
-
+            // Detect En Passant
             if (pieceToMove.type == PieceType.PAWN && from.col != to.col && currentBoard[to] == null) {
                 isEnPassant = true
-                enPassantCapturedPos = BoardPosition(from.row, to.col) // the square beside our pawn
+                enPassantCapturedPos = BoardPosition(from.row, to.col)
                 capturedPiece = currentBoard[enPassantCapturedPos]
             }
 
-            if (pieceToMove.type == PieceType.KING && kotlin.math.abs(from.col - to.col) ==2) {
+            // Detect Castling
+            if (pieceToMove.type == PieceType.KING && kotlin.math.abs(from.col - to.col) == 2) {
                 isCastling = true
             }
 
-            // save the move
-            // val move = ChessMove(pieceToMove, from, to, capturedPiece, isEnPassant)
-
-            // changed to
-            val move = ChessMove(
-                piece = pieceToMove,
-                from = from,
-                to = to,
-                capturedPiece = capturedPiece,
-                inEnPassant = isEnPassant, // Modelinde adı inEnPassant olarak kalmış
-                isCastling = isCastling    // İŞTE EKSİK OLAN HAYATİ PARÇA!
-            )
-
-            _moveHistory.value = _moveHistory.value + move
-
-            // pawn promootion logic (for now auto queen) TODO: extend to underpromotion
+            // Pawn promotion logic
             var pieceToPlace = pieceToMove
-             // if a pawn reaches to the 0th row (w) or 7th row (b) promote to queen
             if (pieceToMove.type == PieceType.PAWN) {
                 if ((pieceToMove.color == ChessColor.WHITE && to.row == 0) ||
                     (pieceToMove.color == ChessColor.BLACK && to.row == 7)) {
@@ -107,40 +88,57 @@ class ChessViewModel : ViewModel() {
                 }
             }
 
-            // the flag now is moved
+            // --- YENİ: PARALEL EVREN SİMÜLASYONU (Açmaz ve Şah Kontrolü) ---
+            val simulatedBoard = currentBoard.toMutableMap()
+            simulatedBoard.remove(from)
+            simulatedBoard[to] = pieceToPlace
+            if (isEnPassant && enPassantCapturedPos != null) simulatedBoard.remove(enPassantCapturedPos)
+
+            // If this move leaves our own king in check, abort the move! (Absolute Pin or Moving into Check)
+            if (isKingInCheck(simulatedBoard, pieceToMove.color)) {
+                return // DO NOTHING. UI will snap the piece back.
+            }
+            // ---------------------------------------------------------------
+
+            // save the move
+            val move = ChessMove(
+                piece = pieceToMove,
+                from = from,
+                to = to,
+                capturedPiece = capturedPiece,
+                inEnPassant = isEnPassant,
+                isCastling = isCastling
+            )
+            _moveHistory.value = _moveHistory.value + move
+
             pieceToPlace = pieceToPlace.copy(hasMoved = true)
 
             // execute the move on board
             currentBoard.remove(from)
             currentBoard[to] = pieceToPlace
 
-            // NEW: Remove the ghost pawn that was captured via En Passant
             if (isEnPassant && enPassantCapturedPos != null) {
                 currentBoard.remove(enPassantCapturedPos)
             }
 
-            // castling execution
             if (isCastling) {
                 val isKingside = to.col > from.col
                 val rookStartCol = if (isKingside) 7 else 0
                 val rookEndCol = if (isKingside) to.col - 1 else to.col + 1
-
                 val rookStartPos = BoardPosition(from.row, rookStartCol)
                 val rookEndPos = BoardPosition(from.row, rookEndCol)
-
                 val rook = currentBoard[rookStartPos]
                 if (rook != null) {
                     currentBoard.remove(rookStartPos)
-                    // flag rook as 'moved' & move
                     currentBoard[rookEndPos] = rook.copy(hasMoved = true)
                 }
             }
 
             _boardState.value = currentBoard
-            // Switch the turn after a successful move
-            _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
+            val nextTurn = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
+            _currentTurn.value = nextTurn
+
             viewModelScope.launch {
-                // If a piece was captured normally, or via En Passant
                 if (capturedPiece != null || isEnPassant) {
                     _gameEvents.emit(GameEvent.Capture)
                 } else {
@@ -148,6 +146,25 @@ class ChessViewModel : ViewModel() {
                 }
             }
 
+            // --- YENİ: ŞAH-MAT VE PAT KONTROLÜ (Oyun bitti mi?) ---
+            val isNextPlayerInCheck = isKingInCheck(currentBoard, nextTurn)
+            val hasNextPlayerMoves = hasLegalMoves(currentBoard, nextTurn, move)
+
+            if (!hasNextPlayerMoves) {
+                if (isNextPlayerInCheck) {
+                    //println("GAME OVER! CHECKMATE! ${pieceToMove.color} wins!")
+                    // Log.d (d = debug)
+                    Log.d("AndroChess_Game", "GAME OVER! CHECKMATE! ${pieceToMove.color} wins!")
+                    // TODO: UI Dialog
+                } else {
+                    //println("GAME OVER! STALEMATE! It's a draw.")
+                    Log.d("AndroChess_Game", "GAME OVER! STALEMATE! It's a draw.")
+                }
+            } else if (isNextPlayerInCheck) {
+                //println("CHECK!") // Şah çekildi!
+                Log.d("AndroChess_Game", "CHECK!")
+            }
+            // ------------------------------------------------------
         }
     }
     fun undoLastMove() {
@@ -199,8 +216,8 @@ class ChessViewModel : ViewModel() {
 //                currentBoard.remove(rookEndPos)
 //                // move rook its originated square & flag as not moved yet
 //                currentBoard[rookStartPos] = rook.copy(hasMoved = false)
- //           }
- //       }
+        //           }
+        //       }
 
 
 
