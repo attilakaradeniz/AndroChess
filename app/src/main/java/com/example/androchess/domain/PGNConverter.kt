@@ -12,28 +12,37 @@ fun BoardPosition.toAlgebraic(): String {
 // Converts a single ChessMove into standard PGN notation
 fun ChessMove.toPGN(): String {
     // castling notation (O-O or O-O-O)
-    if (this.isCastling) {
-    return if (this.to.col > this.from.col) "O-O" else "O-O-O"
+    val basePgn = if (this.isCastling) {
+        if (this.to.col > this.from.col) "O-O" else "O-O-O"
+    } else {
+        // Determine the piece letter
+        val pieceStr = when (this.piece.type) {
+            PieceType.PAWN -> "" // Pawns don't have a letter in PGN
+            PieceType.KNIGHT -> "N"
+            PieceType.BISHOP -> "B"
+            PieceType.ROOK -> "R"
+            PieceType.QUEEN -> "Q"
+            PieceType.KING -> "K"
+        }
+
+        // Determine if it was a capture
+        val captureStr = if (this.capturedPiece != null) {
+            // If a pawn captures, it includes its starting file (e.g., "exd4")
+            if (this.piece.type == PieceType.PAWN) "${('a' + this.from.col)}x" else "x"
+        } else ""
+
+        // Combine them with the destination square + NEW: Disambiguation!
+        "$pieceStr${this.disambiguation}$captureStr${this.to.toAlgebraic()}"
     }
 
-    // Determine the piece letter
-    val pieceStr = when (this.piece.type) {
-        PieceType.PAWN -> "" // Pawns don't have a letter in PGN
-        PieceType.KNIGHT -> "N"
-        PieceType.BISHOP -> "B"
-        PieceType.ROOK -> "R"
-        PieceType.QUEEN -> "Q"
-        PieceType.KING -> "K"
+    // check & checkmate signs
+    val suffix = when {
+        this.isCheckmate -> "#"
+        this.isCheck -> "+"
+        else -> ""
     }
 
-    // Determine if it was a capture
-    val captureStr = if (this.capturedPiece != null) {
-        // If a pawn captures, it includes its starting file (e.g., "exd4")
-        if (this.piece.type == PieceType.PAWN) "${('a' + this.from.col)}x" else "x"
-    } else ""
-
-    // Combine them with the destination square
-    return "$pieceStr$captureStr${this.to.toAlgebraic()}"
+    return "$basePgn$suffix"
 }
 
 // Converts a list of moves into a full PGN string
@@ -48,4 +57,3 @@ fun List<ChessMove>.toPGNString(): String {
     }
     return sb.toString().trim()
 }
-

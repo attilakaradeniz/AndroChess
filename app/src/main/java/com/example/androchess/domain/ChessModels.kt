@@ -34,7 +34,11 @@ data class ChessMove(
     // en passant mark (necessary to know in case of undoing correctly
     val inEnPassant: Boolean = false,
     // required for undoing castling
-    val isCastling: Boolean = false
+    val isCastling: Boolean = false,
+    // flags for notation etc
+    val isCheck: Boolean = false,
+    val isCheckmate: Boolean = false,
+    val disambiguation: String = ""
 )
 
 // Represents events that happen during the game (like playing a sound)

@@ -87,7 +87,7 @@ class ChessViewModel : ViewModel() {
                 }
             }
 
-            // --- YENİ: PARALEL EVREN SİMÜLASYONU (Açmaz ve Şah Kontrolü) ---
+            // --- PARALEL EVREN SİMÜLASYONU (Açmaz ve Şah Kontrolü) ---
             val simulatedBoard = currentBoard.toMutableMap()
             simulatedBoard.remove(from)
             simulatedBoard[to] = pieceToPlace
@@ -99,6 +99,37 @@ class ChessViewModel : ViewModel() {
             }
             // ---------------------------------------------------------------
 
+            // --- YENİ: DISAMBIGUATION (BELİRSİZLİK) ÇÖZÜCÜ ---
+            var disambiguationStr = ""
+            if (pieceToMove.type != PieceType.PAWN && pieceToMove.type != PieceType.KING) {
+                val competingPieces = currentBoard.entries.filter {
+                    it.value.type == pieceToMove.type &&
+                            it.value.color == pieceToMove.color &&
+                            it.key != from &&
+                            isValidMove(currentBoard, it.key, to, lastMove)
+                }.filter {
+                    // Pinned check (Açmazdaki taşlar notasyonda kafa karıştırmaz)
+                    val simBoard = currentBoard.toMutableMap()
+                    simBoard.remove(it.key)
+                    simBoard[to] = it.value
+                    !isKingInCheck(simBoard, pieceToMove.color)
+                }
+
+                if (competingPieces.isNotEmpty()) {
+                    val sameFile = competingPieces.any { it.key.col == from.col }
+                    val sameRank = competingPieces.any { it.key.row == from.row }
+
+                    disambiguationStr = if (!sameFile) {
+                        ('a' + from.col).toString() // Aynı sütunda değillerse sütunu yaz (örn: Nbd2)
+                    } else if (!sameRank) {
+                        (8 - from.row).toString() // Aynı sütundalarsa satırı yaz (örn: R1e3)
+                    } else {
+                        "${('a' + from.col)}${8 - from.row}" // Aşırı nadir durum: Hem satır hem sütun aynıysa (örn: Qa1b2)
+                    }
+                }
+            }
+            // -------------------------------------------------
+
             // save the move
             val move = ChessMove(
                 piece = pieceToMove,
@@ -106,7 +137,8 @@ class ChessViewModel : ViewModel() {
                 to = to,
                 capturedPiece = capturedPiece,
                 inEnPassant = isEnPassant,
-                isCastling = isCastling
+                isCastling = isCastling,
+                disambiguation = disambiguationStr // YENİ
             )
             _moveHistory.value = _moveHistory.value + move
 
@@ -148,9 +180,21 @@ class ChessViewModel : ViewModel() {
                 }
             }
 
-            // --- YENİ: ŞAH-MAT VE PAT KONTROLÜ (Oyun bitti mi?) ---
+            // --- ŞAH-MAT VE PAT KONTROLÜ (Oyun bitti mi?) ---
             val isNextPlayerInCheck = isKingInCheck(currentBoard, nextTurn)
             val hasNextPlayerMoves = hasLegalMoves(currentBoard, nextTurn, move)
+
+            // --- PGN İÇİN SON HAMLEYİ GÜNCELLE ---
+            val updatedHistory = _moveHistory.value.toMutableList()
+            if (updatedHistory.isNotEmpty()) {
+                val lastRecordedMove = updatedHistory.last()
+                updatedHistory[updatedHistory.lastIndex] = lastRecordedMove.copy(
+                    isCheck = isNextPlayerInCheck && hasNextPlayerMoves,
+                    isCheckmate = isNextPlayerInCheck && !hasNextPlayerMoves
+                )
+                _moveHistory.value = updatedHistory
+            }
+            // --------------------------------------------------------------
 
             if (!hasNextPlayerMoves) {
                 if (isNextPlayerInCheck) {
@@ -228,7 +272,7 @@ class ChessViewModel : ViewModel() {
 
         _boardState.value = currentBoard
 
-        // YENİ: Geri alınan hamleyi çöpe atma, Redo (gelecek) kutusuna koy
+        // do not delete the tookback move, instead, put it in redo state
         _redoStack.value = _redoStack.value + lastMove
 
         _moveHistory.value = history.dropLast(1)
@@ -239,15 +283,15 @@ class ChessViewModel : ViewModel() {
 
     fun redoLastMove() {
         val future = _redoStack.value
-        if (future.isEmpty()) return // Gidilecek bir gelecek yoksa dur
+        if (future.isEmpty()) return // stop, if there is no more move
 
         val moveToRedo = future.last()
         val currentBoard = _boardState.value.toMutableMap()
 
-        // 1. Taşı eski yerinden kaldır
+        // move the piece form its old square
         currentBoard.remove(moveToRedo.from)
 
-        // 2. Terfi (Promotion) kontrolü
+        // promotion check
         var pieceToPlace = moveToRedo.piece
         if (pieceToPlace.type == PieceType.PAWN) {
             if ((pieceToPlace.color == ChessColor.WHITE && moveToRedo.to.row == 0) ||
@@ -257,16 +301,16 @@ class ChessViewModel : ViewModel() {
         }
         pieceToPlace = pieceToPlace.copy(hasMoved = true)
 
-        // 3. Taşı yeni yerine koy
+        // plaec the piece to its new square
         currentBoard[moveToRedo.to] = pieceToPlace
 
-        // 4. En Passant ile yenmiş hayalet taşı sil
+        // delete the pawn in the event of en passant
         if (moveToRedo.inEnPassant) {
             val capturedPawnPos = BoardPosition(moveToRedo.from.row, moveToRedo.to.col)
             currentBoard.remove(capturedPawnPos)
         }
 
-        // 5. Rok atılmışsa Kaleyi de ışınla
+        // in case of castle bounce the rook to the other side
         if (moveToRedo.isCastling) {
             val isKingside = moveToRedo.to.col > moveToRedo.from.col
             val rookStartCol = if (isKingside) 7 else 0
@@ -280,13 +324,13 @@ class ChessViewModel : ViewModel() {
             }
         }
 
-        // 6. State'leri güncelle (Geçmişe ekle, Gelecekten sil)
+        // update states (add to past, delete from future
         _boardState.value = currentBoard
         _moveHistory.value = _moveHistory.value + moveToRedo
         _redoStack.value = future.dropLast(1)
         _currentTurn.value = if (_currentTurn.value == ChessColor.WHITE) ChessColor.BLACK else ChessColor.WHITE
 
-        // 7. Hamle ileri sarılırken de kılıç sesleri çıksın!
+        // make also sounds in case of navigate
         viewModelScope.launch {
             if (moveToRedo.capturedPiece != null || moveToRedo.inEnPassant) {
                 _gameEvents.emit(GameEvent.Capture)
