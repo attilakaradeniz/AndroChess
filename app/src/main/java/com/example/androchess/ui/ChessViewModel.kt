@@ -46,6 +46,14 @@ class ChessViewModel : ViewModel() {
     private val _redoStack = MutableStateFlow<List<ChessMove>>(emptyList())
     val redoStack: StateFlow<List<ChessMove>> = _redoStack.asStateFlow()
 
+    // NEW: Sound toggle state
+    private val _isSoundEnabled = MutableStateFlow(true)
+    val isSoundEnabled: StateFlow<Boolean> = _isSoundEnabled.asStateFlow()
+
+    fun toggleSound() {
+        _isSoundEnabled.value = !_isSoundEnabled.value
+    }
+
 
     fun toggleBoardFlip() {
         _isBoardFlipped.value = !_isBoardFlipped.value
@@ -210,7 +218,7 @@ class ChessViewModel : ViewModel() {
                 //println("CHECK!") // Şah çekildi!
                 Log.d("AndroChess_Game", "CHECK!")
             }
-            // ------------------------------------------------------
+
         }
     }
     fun undoLastMove() {

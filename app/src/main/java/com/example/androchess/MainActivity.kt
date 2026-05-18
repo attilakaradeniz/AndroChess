@@ -38,16 +38,30 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.androchess.ui.SoundManager
 import com.example.androchess.domain.GameEvent
 
-// --- EKSİK İMPORTLAR BURAYA GELDİ ---
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.collectAsState
-// ------------------------------------
+
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -57,20 +71,71 @@ class MainActivity : ComponentActivity() {
 
                 val context = LocalContext.current
                 val soundManager = remember { SoundManager(context) }
+                // NEW: Hold the state for showing/hiding the Settings Dialog
+                var showSettingsDialog by remember { mutableStateOf(false) }
+                // NEW: Observe the sound setting
+                val isSoundEnabled = chessViewModel.isSoundEnabled.collectAsState().value
+
                 // NEW: Listen for game events (sounds) from the ViewModel
                 LaunchedEffect(Unit) {
                     chessViewModel.gameEvents.collect { event ->
-                        when (event) {
-                            is GameEvent.Move -> soundManager.playMoveSound()
-                            is GameEvent.Capture -> soundManager.playCaptureSound()
+                        // NEW: Play sound ONLY if the switch is ON
+                        if (chessViewModel.isSoundEnabled.value) {
+                            when (event) {
+                                is GameEvent.Move -> soundManager.playMoveSound()
+                                is GameEvent.Capture -> soundManager.playCaptureSound()
+                            }
                         }
                     }
+                }
+
+// NEW: Settings Dialog UI
+                if (showSettingsDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSettingsDialog = false },
+                        title = { Text("Settings") },
+                        text = {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Sound Effects")
+                                    Switch(
+                                        checked = isSoundEnabled,
+                                        onCheckedChange = { chessViewModel.toggleSound() }
+                                    )
+                                }
+                                // Gelecekte buraya Language Toggle (TR/EN) gibi başka ayarlar da eklenecek!
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showSettingsDialog = false }) {
+                                Text("OK")
+                            }
+                        }
+                    )
                 }
 
 
                 // Scaffold provides the safe area padding
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                // --- YENİ: ÜST MENÜ ÇUBUĞU (TOP BAR) ---
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("AndroChess") },
+                            actions = {
+                                IconButton(onClick = { showSettingsDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings"
+                                    )
+                                }
+                            }
+                        )
+                    },
                     floatingActionButton = {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 
