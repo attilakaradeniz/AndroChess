@@ -126,13 +126,13 @@ class MainActivity : ComponentActivity() {
                     ) {
                         // Instantiate the ViewModel using the Compose Lifecycle function
                         // val chessViewModel: ChessViewModel = viewModel()
-                        // YENİ: Tahta ve Hamle Listesini alt alta dizmek için Column kullanıyoruz
+                        // column placement for board & move list
                         Column(modifier = Modifier.fillMaxSize()) {
 
                             // Pass the ViewModel to our board view
                             ChessBoardView(viewModel = chessViewModel)
 
-                            // Altta Hamle Listesi (Scroll edilebilir metin kutusu)
+                            // move list (below the board)
                             val moveHistory = chessViewModel.moveHistory.collectAsState().value
                             val pgnText = moveHistory.toPGNString()
                             Box(
@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-            } // AndroChessTheme kapanışı
-        } // setContent kapanışı
-    } // onCreate kapanışı
-} // MainActivity kapanışı
+            } // AndroChessTheme close
+        } // setContent close
+    } // onCreate close
+} // MainActivity close
