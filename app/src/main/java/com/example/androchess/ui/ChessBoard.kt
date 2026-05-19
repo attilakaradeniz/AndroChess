@@ -1,85 +1,152 @@
 package com.example.androchess.ui
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.androchess.domain.BoardPosition
 import kotlin.math.roundToInt
-import com.example.androchess.ui.ChessViewModel
 
 val LightSquareColor = Color(0xFFEBECD0)
 val DarkSquareColor = Color(0xFF779556)
+val HighlightColor = Color(0x66E5A93C) // background selected piece
+val HoverColor = Color(0x99A5D6A7)     // highlighting when dragging
 
 @Composable
 fun ChessBoardView(viewModel: ChessViewModel) {
-    // Observe the board state from the ViewModel
     val boardState by viewModel.boardState.collectAsState()
-
-    // state for boerd direction
     val isFlipped by viewModel.isBoardFlipped.collectAsState()
+    val selectedPosition by viewModel.selectedPosition.collectAsState()
+    val validMoves by viewModel.validMoves.collectAsState()
+    val currentTurn by viewModel.currentTurn.collectAsState()
 
-    // BoxWithConstraints allows us to know the exact pixel size of the screen/board
+    // move history from viewModel
+    val moveHistory by viewModel.moveHistory.collectAsState()
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
             .padding(16.dp)
     ) {
-        // Calculate the width of a single square in pixels
         val squareSizePx = constraints.maxWidth / 8f
-
-        // Keep track of which position is currently being dragged at the board level
         var draggedPosition by remember { mutableStateOf<BoardPosition?>(null) }
+        var hoverPosition by remember { mutableStateOf<BoardPosition?>(null) }
 
         Column(modifier = Modifier.fillMaxSize()) {
             for (row in 0 until 8) {
                 val displayRow = if (isFlipped) 7 - row else row
 
-                // Elevate the entire Row if it contains the piece being dragged
+                // Z-INDEX
                 val rowHasDragging = draggedPosition?.row == displayRow
+                val rowHasHover = hoverPosition?.row == displayRow
+                val rowZIndex = if (rowHasDragging) 2f else if (rowHasHover) 1f else 0f
 
                 Row(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .zIndex(if (rowHasDragging) 1f else 0f) // this brings row to the front (no vanish effect)
+                        .zIndex(rowZIndex)
                 ) {
                     for (col in 0 until 8) {
-                        // for flipboard
-                        //val displayRow = if (isFlipped)  7 - row else row
-
-                        val displayCol = if (isFlipped)  7- col else col
-
-                        val isLightSquare = (displayRow + displayCol) % 2 == 0
-                        val squareColor = if (isLightSquare) LightSquareColor else DarkSquareColor
-
+                        val displayCol = if (isFlipped) 7 - col else col
                         val currentPosition = BoardPosition(displayRow, displayCol)
                         val pieceOnSquare = boardState[currentPosition]
 
-                        // NEW: Elevate the specific Box if it is the one being dragged
+                        // states
+                        val isSelected = selectedPosition == currentPosition
+                        val isMoveTarget = validMoves.contains(currentPosition)
                         val isDraggingThisSquare = draggedPosition == currentPosition
+                        val isHoveringValidTarget = hoverPosition == currentPosition && isMoveTarget
+
+                        // last move check
+                        val lastMove = moveHistory.lastOrNull()
+                        val isLastMove = lastMove?.from == currentPosition || lastMove?.to == currentPosition
+
+                        // base colors
+                        val isLightSquare = (displayRow + displayCol) % 2 == 0
+                        val baseColor = if (isLightSquare) LightSquareColor else DarkSquareColor
+
+                        //
+                        val squareColor = when {
+                            isSelected -> HighlightColor // selected piece
+                            isLastMove -> Color(0xFFE5A93C).copy(alpha = 0.5f) // last move trace
+                            else -> baseColor // regular base color
+                        }
+
+                        // Z-INDEX
+                        val squareZIndex = if (isDraggingThisSquare) 2f else if (isHoveringValidTarget) 1f else 0f
 
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxSize()
                                 .background(squareColor)
-                                .zIndex(if (isDraggingThisSquare) 1f else 0f) // square to the front
+                                .clickable { viewModel.onSquareClick(currentPosition) }
+                                .zIndex(squareZIndex)
                         ) {
+
+                            // target and legal move indicators
+                            if (isHoveringValidTarget) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .scale(2.0f) // circle shape overflow size %200
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.4f)) // semi transparent red
+                                        //.background(Color.Red.copy(alpha = 0.4f)) // semi transparent red
+                                )
+                            } else if (isMoveTarget) {
+                                val isCapture = pieceOnSquare != null
+                                if (isCapture) {
+                                    // capturable piece
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(2.dp)
+                                            .border(6.dp, Color.Black.copy(alpha = 0.25f), CircleShape)
+                                    )
+                                } else {
+                                    // clear legal square
+                                    Box(
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .align(Alignment.Center)
+                                            .clip(CircleShape)
+                                            .background(Color.Black.copy(alpha = 0.25f))
+                                    )
+                                }
+                            }
+
                             if (pieceOnSquare != null) {
-                                // State variables to track dragging offset
                                 var offsetX by remember { mutableStateOf(0f) }
                                 var offsetY by remember { mutableStateOf(0f) }
-                                //var isDragging by remember { mutableStateOf(false) }
+
+                                val pieceScale by animateFloatAsState(
+                                    targetValue = if (isDraggingThisSquare) 2.0f else 1f,
+                                    label = "scale"
+                                )
+                                val pieceLift by animateFloatAsState(
+                                    targetValue = if (isDraggingThisSquare) -150f else 0f,
+                                    label = "lift"
+                                )
+
+                                val isMyTurn = pieceOnSquare.color == currentTurn
 
                                 Image(
                                     painter = painterResource(id = getPieceDrawable(pieceOnSquare)),
@@ -87,37 +154,38 @@ fun ChessBoardView(viewModel: ChessViewModel) {
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .padding(2.dp)
-                                        // Visually move the image based on drag offset
-                                        .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                                        // Handle drag gestures
-                                        .pointerInput(Unit) {
+                                        .pointerInput(isMyTurn) {
+                                            if (!isMyTurn) return@pointerInput
+
                                             detectDragGestures(
                                                 onDragStart = {
-                                                    // Tell the board which piece is moving
                                                     draggedPosition = currentPosition
-                                                              },
+                                                    viewModel.selectPiece(currentPosition)
+                                                },
                                                 onDragEnd = {
-                                                    // Clear the dragged position
                                                     draggedPosition = null
+                                                    hoverPosition = null
+                                                    viewModel.clearSelection()
 
-                                                    // if board flipped reverse dragging calculation
                                                     val directionMultiplier = if (isFlipped) -1 else 1
-
-                                                    // Calculate how many squares the piece was dragged
                                                     val colOffset = (offsetX / squareSizePx).roundToInt() * directionMultiplier
                                                     val rowOffset = (offsetY / squareSizePx).roundToInt() * directionMultiplier
 
-                                                    // Determine the target position
                                                     val targetRow = displayRow + rowOffset
                                                     val targetCol = displayCol + colOffset
 
-                                                    // Validate if the move is within the board limits
                                                     if (targetRow in 0..7 && targetCol in 0..7) {
                                                         val targetPosition = BoardPosition(targetRow, targetCol)
                                                         viewModel.movePiece(currentPosition, targetPosition)
                                                     }
 
-                                                    // Reset the visual offset (the state update will redraw it at the new square)
+                                                    offsetX = 0f
+                                                    offsetY = 0f
+                                                },
+                                                onDragCancel = {
+                                                    draggedPosition = null
+                                                    hoverPosition = null
+                                                    viewModel.clearSelection()
                                                     offsetX = 0f
                                                     offsetY = 0f
                                                 },
@@ -125,8 +193,28 @@ fun ChessBoardView(viewModel: ChessViewModel) {
                                                     change.consume()
                                                     offsetX += dragAmount.x
                                                     offsetY += dragAmount.y
+
+                                                    val directionMultiplier = if (isFlipped) -1 else 1
+                                                    val colOffset = (offsetX / squareSizePx).roundToInt() * directionMultiplier
+                                                    val rowOffset = (offsetY / squareSizePx).roundToInt() * directionMultiplier
+                                                    val targetRow = displayRow + rowOffset
+                                                    val targetCol = displayCol + colOffset
+
+                                                    val newHover = if (targetRow in 0..7 && targetCol in 0..7) {
+                                                        BoardPosition(targetRow, targetCol)
+                                                    } else null
+
+                                                    if (hoverPosition != newHover) {
+                                                        hoverPosition = newHover
+                                                    }
                                                 }
                                             )
+                                        }
+                                        .graphicsLayer {
+                                            translationX = offsetX
+                                            translationY = offsetY + pieceLift
+                                            scaleX = pieceScale
+                                            scaleY = pieceScale
                                         }
                                 )
                             }

@@ -23,6 +23,7 @@ import com.example.androchess.domain.GameEvent
 
 import com.example.androchess.domain.isKingInCheck
 import com.example.androchess.domain.hasLegalMoves
+import kotlinx.coroutines.flow.lastOrNull
 
 class ChessViewModel : ViewModel() {
 
@@ -46,9 +47,11 @@ class ChessViewModel : ViewModel() {
     private val _redoStack = MutableStateFlow<List<ChessMove>>(emptyList())
     val redoStack: StateFlow<List<ChessMove>> = _redoStack.asStateFlow()
 
-    // NEW: Sound toggle state
+    // Sound toggle state
     private val _isSoundEnabled = MutableStateFlow(true)
     val isSoundEnabled: StateFlow<Boolean> = _isSoundEnabled.asStateFlow()
+
+
 
     fun toggleSound() {
         _isSoundEnabled.value = !_isSoundEnabled.value
@@ -95,19 +98,19 @@ class ChessViewModel : ViewModel() {
                 }
             }
 
-            // --- PARALEL EVREN SİMÜLASYONU (Açmaz ve Şah Kontrolü) ---
+            // absolut pin & check check
             val simulatedBoard = currentBoard.toMutableMap()
             simulatedBoard.remove(from)
             simulatedBoard[to] = pieceToPlace
             if (isEnPassant && enPassantCapturedPos != null) simulatedBoard.remove(enPassantCapturedPos)
 
-            // If this move leaves our own king in check, abort the move! (Absolute Pin or Moving into Check)
+            // if this move leaves our own king in check, abort the move! (Absolute Pin or Moving into Check)
             if (isKingInCheck(simulatedBoard, pieceToMove.color)) {
                 return // DO NOTHING. UI will snap the piece back.
             }
-            // ---------------------------------------------------------------
 
-            // --- YENİ: DISAMBIGUATION (BELİRSİZLİK) ÇÖZÜCÜ ---
+
+            // disambiguation solution
             var disambiguationStr = ""
             if (pieceToMove.type != PieceType.PAWN && pieceToMove.type != PieceType.KING) {
                 val competingPieces = currentBoard.entries.filter {
@@ -116,7 +119,7 @@ class ChessViewModel : ViewModel() {
                             it.key != from &&
                             isValidMove(currentBoard, it.key, to, lastMove)
                 }.filter {
-                    // Pinned check (Açmazdaki taşlar notasyonda kafa karıştırmaz)
+                    // Pinned check
                     val simBoard = currentBoard.toMutableMap()
                     simBoard.remove(it.key)
                     simBoard[to] = it.value
@@ -136,7 +139,7 @@ class ChessViewModel : ViewModel() {
                     }
                 }
             }
-            // -------------------------------------------------
+
 
             // save the move
             val move = ChessMove(
@@ -188,11 +191,11 @@ class ChessViewModel : ViewModel() {
                 }
             }
 
-            // --- ŞAH-MAT VE PAT KONTROLÜ (Oyun bitti mi?) ---
+            // check & checkmate check (is the game ended)
             val isNextPlayerInCheck = isKingInCheck(currentBoard, nextTurn)
             val hasNextPlayerMoves = hasLegalMoves(currentBoard, nextTurn, move)
 
-            // --- PGN İÇİN SON HAMLEYİ GÜNCELLE ---
+            // update move for PGN
             val updatedHistory = _moveHistory.value.toMutableList()
             if (updatedHistory.isNotEmpty()) {
                 val lastRecordedMove = updatedHistory.last()
@@ -202,7 +205,7 @@ class ChessViewModel : ViewModel() {
                 )
                 _moveHistory.value = updatedHistory
             }
-            // --------------------------------------------------------------
+
 
             if (!hasNextPlayerMoves) {
                 if (isNextPlayerInCheck) {
@@ -220,6 +223,7 @@ class ChessViewModel : ViewModel() {
             }
 
         }
+        clearSelection()
     }
     fun undoLastMove() {
         val history = _moveHistory.value
@@ -332,7 +336,7 @@ class ChessViewModel : ViewModel() {
             }
         }
 
-        // update states (add to past, delete from future
+        // update states (add to past, delete from future)
         _boardState.value = currentBoard
         _moveHistory.value = _moveHistory.value + moveToRedo
         _redoStack.value = future.dropLast(1)
@@ -347,4 +351,76 @@ class ChessViewModel : ViewModel() {
             }
         }
     }
+
+// tap to move logic
+
+    private val _selectedPosition = MutableStateFlow<BoardPosition?>(null)
+    val selectedPosition: StateFlow<BoardPosition?> = _selectedPosition.asStateFlow()
+
+    private val _validMoves = MutableStateFlow<List<BoardPosition>>(emptyList())
+    val validMoves: StateFlow<List<BoardPosition>> = _validMoves.asStateFlow()
+
+    fun onSquareClick(pos: BoardPosition) {
+        val currentSelected = _selectedPosition.value
+        val currentBoard = _boardState.value
+        val pieceAtClicked = currentBoard[pos]
+
+        if (currentSelected != null) {
+            // do the legal move (in case of second click (tap))
+            if (_validMoves.value.contains(pos)) {
+                movePiece(currentSelected, pos)
+                return
+            }
+
+            // bring the selected indicator to last selected piece
+            if (pieceAtClicked != null && pieceAtClicked.color == _currentTurn.value) {
+                selectPiece(pos)
+            } else {
+                // toggle selected highlight when tipped on other square
+                clearSelection()
+            }
+        } else {
+            // when nothing selected & own piece selected
+            if (pieceAtClicked != null && pieceAtClicked.color == _currentTurn.value) {
+                selectPiece(pos)
+            }
+        }
+    }
+
+    // private fun selectPiece(pos: BoardPosition) {
+    // not anymore private
+    fun selectPiece(pos: BoardPosition) {
+        _selectedPosition.value = pos
+        calculateValidMoves(pos)
+    }
+
+    fun clearSelection() {
+        _selectedPosition.value = null
+        _validMoves.value = emptyList()
+    }
+
+    private fun calculateValidMoves(pos: BoardPosition) {
+        val currentBoard = _boardState.value
+        val piece = currentBoard[pos] ?: return
+        val lastMove = _moveHistory.value.lastOrNull()
+
+        val moves = mutableListOf<BoardPosition>()
+        for (row in 0..7) {
+            for (col in 0..7) {
+                val target = BoardPosition(row, col)
+                if (isValidMove(currentBoard, pos, target, lastMove)) {
+                    // absolut pin check
+                    val simBoard = currentBoard.toMutableMap()
+                    simBoard.remove(pos)
+                    simBoard[target] = piece
+                    if (!isKingInCheck(simBoard, piece.color)) {
+                        moves.add(target)
+                    }
+                }
+            }
+        }
+        _validMoves.value = moves
+    }
+
+
 }
