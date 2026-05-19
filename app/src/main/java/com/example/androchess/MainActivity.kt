@@ -31,6 +31,7 @@ import android.widget.Toast
 
 // import PGN conv from domain package
 import com.example.androchess.domain.toPGNString
+import com.example.androchess.domain.toPGN // NEW IMPORT ADDED HERE
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -60,6 +61,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 
+// for duo move pane
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+
+// for bottom padding
+import androidx.compose.foundation.layout.PaddingValues
+
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,15 +85,18 @@ class MainActivity : ComponentActivity() {
 
                 val context = LocalContext.current
                 val soundManager = remember { SoundManager(context) }
-                // NEW: Hold the state for showing/hiding the Settings Dialog
+                // Hold the state for showing/hiding the Settings Dialog
                 var showSettingsDialog by remember { mutableStateOf(false) }
-                // NEW: Observe the sound setting
+                // Observe the sound setting
                 val isSoundEnabled = chessViewModel.isSoundEnabled.collectAsState().value
 
-                // NEW: Listen for game events (sounds) from the ViewModel
+                // View toggle state (True = 2 Column, False = Old PGN string)
+                var isTwoColumnView by remember { mutableStateOf(true) }
+
+                // Listen for game events (sounds) from the ViewModel
                 LaunchedEffect(Unit) {
                     chessViewModel.gameEvents.collect { event ->
-                        // NEW: Play sound ONLY if the switch is ON
+                        // Play sound ONLY if the switch is ON
                         if (chessViewModel.isSoundEnabled.value) {
                             when (event) {
                                 is GameEvent.Move -> soundManager.playMoveSound()
@@ -89,7 +106,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-// NEW: Settings Dialog UI
+                // Settings Dialog UI
                 if (showSettingsDialog) {
                     AlertDialog(
                         onDismissRequest = { showSettingsDialog = false },
@@ -107,7 +124,18 @@ class MainActivity : ComponentActivity() {
                                         onCheckedChange = { chessViewModel.toggleSound() }
                                     )
                                 }
-                                // Gelecekte buraya Language Toggle (TR/EN) gibi başka ayarlar da eklenecek!
+                                // Two-column / Old view Toggle
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("2-Column Notation")
+                                    Switch(
+                                        checked = isTwoColumnView,
+                                        onCheckedChange = { isTwoColumnView = it }
+                                    )
+                                }
                             }
                         },
                         confirmButton = {
@@ -122,7 +150,7 @@ class MainActivity : ComponentActivity() {
                 // Scaffold provides the safe area padding
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                // --- YENİ: ÜST MENÜ ÇUBUĞU (TOP BAR) ---
+                    // TOP BAR
                     topBar = {
                         TopAppBar(
                             title = { Text("AndroChess") },
@@ -189,8 +217,6 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        // Instantiate the ViewModel using the Compose Lifecycle function
-                        // val chessViewModel: ChessViewModel = viewModel()
                         // column placement for board & move list
                         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -200,18 +226,95 @@ class MainActivity : ComponentActivity() {
                             // move list (below the board)
                             val moveHistory = chessViewModel.moveHistory.collectAsState().value
                             val pgnText = moveHistory.toPGNString()
+
+                            val listState = rememberLazyListState()
+
+                            // Auto-scroll to the bottom when a new move is added (Only for 2-column view)
+                            LaunchedEffect(moveHistory.size) {
+                                if (moveHistory.isNotEmpty() && isTwoColumnView) {
+                                    listState.animateScrollToItem((moveHistory.size) / 2)
+                                }
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f) // Kalan tüm boşluğu kapla
                                     .padding(16.dp)
-                                    .verticalScroll(rememberScrollState())
                             ) {
-                                Text(
-                                    text = if (pgnText.isEmpty()) "Game started. Make a move!" else pgnText,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
+                                if (moveHistory.isEmpty()) {
+                                    Text(
+                                        text = "Game started. Make a move!",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                } else {
+                                    if (isTwoColumnView) {
+                                        LazyColumn(state = listState,
+                                            modifier = Modifier.fillMaxSize(),
+                                            // add extra padding ...
+                                             contentPadding = PaddingValues(bottom = 98.dp)
+                                        ) {
+                                            val totalPairs = (moveHistory.size + 1) / 2
+                                            items(totalPairs) { index ->
+                                                val whiteMoveIndex = index * 2
+                                                val blackMoveIndex = whiteMoveIndex + 1
+
+                                                val whiteMove = moveHistory.getOrNull(whiteMoveIndex)
+                                                val blackMove = moveHistory.getOrNull(blackMoveIndex)
+
+                                                val isWhiteLast = whiteMoveIndex == moveHistory.lastIndex
+                                                val isBlackLast = blackMoveIndex == moveHistory.lastIndex
+
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 2.dp),
+                                                    horizontalArrangement = Arrangement.Start,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    // Move Number
+                                                    Text(
+                                                        text = "${index + 1}.",
+                                                        modifier = Modifier.width(40.dp),
+                                                        color = Color.Gray
+                                                    )
+
+                                                    // White Move
+                                                    Text(
+                                                        text = whiteMove?.toPGN() ?: "",
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(4.dp))
+                                                            .background(if (isWhiteLast) Color.Gray.copy(alpha = 0.2f) else Color.Transparent)
+                                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    )
+
+                                                    // Black Move
+                                                    Text(
+                                                        text = blackMove?.toPGN() ?: "",
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(4.dp))
+                                                            .background(if (isBlackLast) Color.Gray.copy(alpha = 0.2f) else Color.Transparent)
+                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        // Old plain text view
+                                        Text(
+                                            text = pgnText,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(bottom = 98.dp) // extra padding for FABs
+                                                .verticalScroll(rememberScrollState())
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

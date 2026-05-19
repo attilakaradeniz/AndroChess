@@ -24,8 +24,8 @@ import kotlin.math.roundToInt
 
 val LightSquareColor = Color(0xFFEBECD0)
 val DarkSquareColor = Color(0xFF779556)
-val HighlightColor = Color(0x66E5A93C) // background selected piece
-val HoverColor = Color(0x99A5D6A7)     // highlighting when dragging
+val HighlightColor = Color(0x66E5A93C) // Background for selected piece
+val HoverColor = Color(0x99A5D6A7)     // Highlight for valid target during drag
 
 @Composable
 fun ChessBoardView(viewModel: ChessViewModel) {
@@ -35,7 +35,7 @@ fun ChessBoardView(viewModel: ChessViewModel) {
     val validMoves by viewModel.validMoves.collectAsState()
     val currentTurn by viewModel.currentTurn.collectAsState()
 
-    // move history from viewModel
+    // Observe move history from ViewModel
     val moveHistory by viewModel.moveHistory.collectAsState()
 
     BoxWithConstraints(
@@ -52,7 +52,7 @@ fun ChessBoardView(viewModel: ChessViewModel) {
             for (row in 0 until 8) {
                 val displayRow = if (isFlipped) 7 - row else row
 
-                // Z-INDEX
+                // Z-INDEX LOGIC: Elevate the row if it contains a dragged piece or a hover target
                 val rowHasDragging = draggedPosition?.row == displayRow
                 val rowHasHover = hoverPosition?.row == displayRow
                 val rowZIndex = if (rowHasDragging) 2f else if (rowHasHover) 1f else 0f
@@ -68,28 +68,28 @@ fun ChessBoardView(viewModel: ChessViewModel) {
                         val currentPosition = BoardPosition(displayRow, displayCol)
                         val pieceOnSquare = boardState[currentPosition]
 
-                        // states
+                        // State checks
                         val isSelected = selectedPosition == currentPosition
                         val isMoveTarget = validMoves.contains(currentPosition)
                         val isDraggingThisSquare = draggedPosition == currentPosition
                         val isHoveringValidTarget = hoverPosition == currentPosition && isMoveTarget
 
-                        // last move check
+                        // Last move check
                         val lastMove = moveHistory.lastOrNull()
                         val isLastMove = lastMove?.from == currentPosition || lastMove?.to == currentPosition
 
-                        // base colors
+                        // Base colors
                         val isLightSquare = (displayRow + displayCol) % 2 == 0
                         val baseColor = if (isLightSquare) LightSquareColor else DarkSquareColor
 
-                        //
+                        // Priority-based square color determination
                         val squareColor = when {
-                            isSelected -> HighlightColor // selected piece
-                            isLastMove -> Color(0xFFE5A93C).copy(alpha = 0.5f) // last move trace
-                            else -> baseColor // regular base color
+                            isSelected -> HighlightColor // Highest priority: Clicked and selected piece
+                            isLastMove -> Color(0xFFE5A93C).copy(alpha = 0.5f) // Second priority: Highlight of the last move
+                            else -> baseColor // Default square color
                         }
 
-                        // Z-INDEX
+                        // Square-specific Z-Index
                         val squareZIndex = if (isDraggingThisSquare) 2f else if (isHoveringValidTarget) 1f else 0f
 
                         Box(
@@ -101,20 +101,20 @@ fun ChessBoardView(viewModel: ChessViewModel) {
                                 .zIndex(squareZIndex)
                         ) {
 
-                            // target and legal move indicators
+                            // UI: Target and Legal Move Indicators
                             if (isHoveringValidTarget) {
+                                // Large semi-transparent target ring overflowing under the finger
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .scale(2.0f) // circle shape overflow size %200
+                                        .scale(2.0f)
                                         .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.4f)) // semi transparent red
-                                        //.background(Color.Red.copy(alpha = 0.4f)) // semi transparent red
+                                        .background(Color.White.copy(alpha = 0.4f))
                                 )
                             } else if (isMoveTarget) {
                                 val isCapture = pieceOnSquare != null
                                 if (isCapture) {
-                                    // capturable piece
+                                    // Capturable Piece indicator
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -122,7 +122,7 @@ fun ChessBoardView(viewModel: ChessViewModel) {
                                             .border(6.dp, Color.Black.copy(alpha = 0.25f), CircleShape)
                                     )
                                 } else {
-                                    // clear legal square
+                                    // Empty Valid Square indicator
                                     Box(
                                         modifier = Modifier
                                             .size(14.dp)
